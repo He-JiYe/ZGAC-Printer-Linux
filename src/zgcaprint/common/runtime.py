@@ -28,7 +28,9 @@ def pdf_command():
 
 def tray_command():
     if frozen():return ['/usr/bin/python3','-I',str(resource_root()/'system_helpers/tray.py')]
-    return [sys.executable,'-m','zgcaprint.desktop.tray']
+    # The .deb launcher adds /usr/lib/zgcaprint to its own sys.path only.
+    # A child started with -m cannot inherit that path; this helper is standalone.
+    return [sys.executable,'-I',str(resource_root()/'desktop/tray.py')]
 
 
 def keyring_command():

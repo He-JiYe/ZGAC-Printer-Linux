@@ -3,10 +3,12 @@ from pathlib import Path
 import json
 import subprocess
 import sys
+import pytest
 
 from zgcaprint import __version__
 from zgcaprint.application import launcher
 from zgcaprint.cups import installer
+from zgcaprint.common import runtime
 from tests.test_client import pdf_bytes
 
 
@@ -17,6 +19,25 @@ def test_desktop_launcher_runs_from_an_unrelated_directory(tmp_path):
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == __version__
+
+
+@pytest.mark.parametrize('layout', ['usr/lib/zgcaprint/zgcaprint', 'source/zgcaprint'])
+def test_tray_launch_does_not_require_an_importable_package(tmp_path, monkeypatch, layout):
+    package = tmp_path/layout
+    helper = package/'desktop/tray.py'
+    helper.parent.mkdir(parents=True)
+    # Probe the process boundary without requiring GTK or a desktop session.
+    helper.write_text('import sys\nassert sys.flags.isolated\nprint("ready", flush=True)\n')
+    monkeypatch.setattr(runtime, 'resource_root', lambda: package)
+    monkeypatch.setattr(runtime, 'frozen', lambda: False)
+    unrelated = tmp_path/'unrelated'
+    unrelated.mkdir()
+    (unrelated/'zgcaprint.py').write_text('raise RuntimeError("wrong package")\n')
+    monkeypatch.setenv('PYTHONPATH', str(unrelated))
+    result = subprocess.run(runtime.tray_command(), cwd=unrelated,
+                            capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == 'ready'
 
 
 def test_generated_backend_is_self_contained_and_has_no_upload_or_credentials(tmp_path, monkeypatch):

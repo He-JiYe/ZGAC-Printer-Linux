@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      replace_release:
+        description: Replace the existing version's release assets and tag
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -44,35 +49,54 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: Build and publish a new version
+      - name: Build and publish the version
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          REPLACE_RELEASE: ${{ inputs.replace_release == true || (github.event_name == 'push' && contains(github.event.head_commit.message, '[replace-release]')) }}
         run: |
           version=$(python3 -c 'import sys; sys.path.insert(0,"src"); from zgcaprint import __version__; print(__version__)')
           tag="v$version"
+          existing=false
           if gh release view "$tag" >/dev/null 2>&1; then
-            echo "Version $tag already has a release; no assets will be overwritten."
-            exit 0
+            if [ "$REPLACE_RELEASE" != true ]; then
+              echo "Version $tag already has a release; no assets will be overwritten."
+              exit 0
+            fi
+            existing=true
+            previous_tag=$(gh api "repos/$GH_REPO/git/ref/tags/$tag" --jq .object.sha)
           fi
           notes="$RUNNER_TEMP/release-description.md"
           if [ "$tag" = v1.0.3 ]; then
             cat > "$notes" <<'NOTES'
-          本版改进安装与卸载体验，并优化客户端窗口布局。
+          本版改进安装与卸载体验，优化客户端窗口布局，并修复安装版托盘图标不显示的问题。
 
-          - 区分安装版和开发版入口，清理旧的同名源码入口；卸载后安装版停止接收新任务并在当前操作完成后退出。
-          - 安装完成时明确显示客户端安装成功提示，保留用户配置和打印记录。
-          - 放大 PDF 文件选择窗口，记住上次使用的目录；主窗口保持原大小，设置窗口适当加宽。
-          - 任务表格根据字体调整列宽，完整显示“页数”等标题。
-          - 精简记录清理选项及提示，后台清理逻辑保留。
+          ## 更新内容
 
-          安装或升级前，请先从旧客户端右键菜单选择“退出”，然后执行：
+          - **区分启动入口**：区分安装版和开发版，清理旧的同名源码入口；卸载后安装版停止接收新任务，并在当前操作完成后退出。
+          - **明确安装结果**：安装完成时显示客户端安装成功提示，保留已有配置和打印记录。
+          - **改善文件选择**：放大 PDF 文件选择窗口，记住上次使用的目录；主窗口保持原大小，设置窗口适当加宽。
+          - **适配表格字体**：任务列表根据字体调整列宽，完整显示“页数”等标题。
+          - **精简设置提示**：简化记录清理选项及说明，保留后台清理功能。
+          - **修复托盘图标**：修正安装版托盘进程的启动路径，恢复系统右上角打印图标，并增加独立启动的回归测试。
+
+          ## 安装或升级
+
+          下载本版本的 `.deb`，在下载目录执行：
 
           ```sh
           sudo apt install ./zgcaprint_1.0.3_all.deb
           ```
 
-          [完整变更](https://github.com/He-JiYe/ZGAC-Printer-Linux/compare/v1.0.2...v1.0.3)
+          本页附件已更新为包含托盘修复的 1.0.3。已经安装此前 1.0.3 的用户，请重新下载，并使用以下命令重装：
+
+          ```sh
+          sudo apt install --reinstall ./zgcaprint_1.0.3_all.deb
+          ```
+
+          安装前在客户端主窗口空白处右键选择“退出”，安装后重新打开。已有配置和打印记录保留。
+
+          [查看 v1.0.2 → v1.0.3 的完整变更](https://github.com/He-JiYe/ZGAC-Printer-Linux/compare/v1.0.2...v1.0.3)
           NOTES
           else
             gh api "repos/$GH_REPO/releases/generate-notes" -f tag_name="$tag" -f target_commitish="$GITHUB_SHA" --jq .body > "$notes"
@@ -89,6 +113,17 @@ jobs:
           paths=sorted([*Path('dist').glob('*.deb'), *Path('dist').glob('*-source.zip')])
           Path('dist/SHA256SUMS').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name+'\n' for p in paths))
           PY
-          gh release create "$tag" dist/*.deb dist/*-source.zip dist/SHA256SUMS \
-            --target "$GITHUB_SHA" --title "ZGCA Linux 打印驱动 $tag" \
-            --notes-file "$notes"
+          if [ "$existing" = true ]; then
+            current_tag=$(gh api "repos/$GH_REPO/git/ref/tags/$tag" --jq .object.sha)
+            [ "$current_tag" = "$previous_tag" ] || { echo "Tag changed during the build; refusing replacement." >&2; exit 1; }
+            gh release upload "$tag" dist/*.deb dist/*-source.zip dist/SHA256SUMS --clobber
+            gh api --method PATCH "repos/$GH_REPO/git/refs/tags/$tag" -f sha="$GITHUB_SHA" -F force=true
+            gh release edit "$tag" --target "$GITHUB_SHA" --notes-file "$notes"
+          else
+            gh release create "$tag" dist/*.deb dist/*-source.zip dist/SHA256SUMS \
+              --target "$GITHUB_SHA" --title "ZGCA Linux 打印驱动 $tag" \
+              --notes-file "$notes"
+          fi
+          verify="$RUNNER_TEMP/release-verify"
+          gh release download "$tag" --dir "$verify" --pattern '*.deb' --pattern '*-source.zip' --pattern SHA256SUMS
+          (cd "$verify" && sha256sum --check SHA256SUMS)
