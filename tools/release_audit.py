@@ -11,6 +11,7 @@ def public_files(root=ROOT):
     names=['README.md','LICENCE','pyproject.toml','.gitignore','run-client.sh','examples/print-test.pdf','.github/workflows/release.yml']
     files=[root/name for name in names]
     for folder in ['src/zgcaprint','tests','tools']:files+=sorted((root/folder).rglob('*.py'))
+    files+=sorted((root/'release-notes').glob('v*.md'))
     return files
 
 

@@ -2,7 +2,7 @@
 
 # ZGCA Linux 打印驱动
 
-**v1.0.2** - [MIT LICENSE](LICENCE)
+**[v1.0.2](https://github.com/He-JiYe/ZGAC-Printer-Linux/releases/tag/v1.0.2)** · [License](LICENCE) · [Releases](https://github.com/He-JiYe/ZGAC-Printer-Linux/releases)
 
 </div>
 
@@ -127,6 +127,8 @@ GitHub 工作流会先运行回归测试；尚无对应 Release 的新版本会�
 
 ### 设置说明
 
+<div align="center">
+
 | 设置 | 作用 |
 | --- | --- |
 | 记住密码 | 将密码保存在系统钥匙串，密码框显示黑点提示 |
@@ -134,6 +136,8 @@ GitHub 工作流会先运行回归测试；尚无对应 Release 的新版本会�
 | 自动启动 | 登录 Ubuntu 桌面后自动运行客户端 |
 | 自动提交任务 | 自动提交当前运行中新收到的浏览器任务 |
 
+</div>
+ 
 本地已提交任务会默认保留 **24 小时**，可在设置中调整；不与网页同步。
 
 提交成功后删除客户端 PDF 副本，保留原始文件；未完成任务不会被定时清理。
