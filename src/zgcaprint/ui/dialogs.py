@@ -64,9 +64,9 @@ class ConfirmDialog:
         w.bind('<Button-5>',lambda e:self.canvas.yview_scroll(1,'units'))
         w.bind('<MouseWheel>',lambda e:self.canvas.yview_scroll(-1 if e.delta>0 else 1,'units'))
         w.protocol('WM_DELETE_WINDOW',self.close);w.bind('<Escape>',lambda e:self.close())
-        width,height=fit_size(w,480,320);w.geometry(f'{width}x{height}');w.update_idletasks()
+        width,height=fit_size(w,540,380);w.geometry(f'{width}x{height}');w.update_idletasks()
         natural=header.winfo_reqheight()+self.body.winfo_reqheight()+self.footer.winfo_reqheight()+8
-        _,maximum=fit_size(w,480,10000)
+        _,maximum=fit_size(w,540,10000)
         center(w,owner,width,min(maximum,max(height,natural)))
         w.deiconify();w.grab_set();self.accept_button.focus_set()
 

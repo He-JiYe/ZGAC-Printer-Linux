@@ -66,7 +66,7 @@ def checkbox_style(root,style):
         root._zgca_checkbox_images=images
     style.layout('TCheckbutton',[('Checkbutton.padding',{'sticky':'nswe','children':[
         (name,{'side':'left','sticky':''}),('Checkbutton.label',{'side':'left','sticky':'w'})]})])
-    style.configure('TCheckbutton',background='white',foreground='#17243b',font=('sans',11),padding=(2,6))
+    style.configure('TCheckbutton',background='white',foreground='#17243b',font='TkDefaultFont',padding=(2,6))
     style.map('TCheckbutton',background=[('active','white')],foreground=[('disabled','#98a4b5')])
 
 

@@ -68,10 +68,9 @@ jobs:
           Path('dist/SHA256SUMS').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name+'\n' for p in paths))
           PY
           cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
-          首个正式版本：ZGCA Linux 打印驱动。
+          ZGCA Linux 打印驱动。
 
-          普通用户下载 .deb，在下载目录运行：
-          `sudo apt install ./zgcaprint_1.0.0_all.deb`
+          普通用户下载本 Release 附带的 .deb，在下载目录使用 `sudo apt install ./安装包文件名.deb` 安装。
 
           系统自动处理依赖。打开应用后连接校园内网，客户端自动下载并校验官方配置，再输入本人的打印账号。
 

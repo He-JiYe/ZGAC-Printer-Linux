@@ -8,21 +8,24 @@ from tkinter import filedialog, ttk
 from zgcaprint.common.errors import PrintError
 from zgcaprint.config.bootstrap import provision
 from zgcaprint.ui.dialogs import fit_size
+from zgcaprint.ui.typography import configure_fonts
 
 
 class SetupWindow:
     def __init__(self, home, provisioner=provision):
         self.home, self.provisioner = home, provisioner
         self.root = tk.Tk();self.root.title('ZGCA Linux 打印驱动 - 首次配置')
+        self.fonts=configure_fonts(self.root)
         self.root.configure(bg='#f3f5f9')
-        self.root.geometry('%dx%d' % fit_size(self.root, 600, 390))
+        self.root.geometry('%dx%d' % fit_size(self.root, 660, 460))
         self.root.minsize(*fit_size(self.root, 420, 300))
         self.events, self.cancelled = queue.Queue(), threading.Event()
         self.busy = self.success = self.closed = False
         self.root.columnconfigure(0, weight=1);self.root.rowconfigure(0, weight=1)
         body = ttk.Frame(self.root, padding=28);body.grid(row=0, column=0, sticky='nsew')
         body.columnconfigure(0, weight=1)
-        ttk.Label(body, text='欢迎使用 ZGCA Linux 打印驱动', font=('', 17, 'bold')).grid(row=0, sticky='w', pady=(0, 16))
+        self.title=ttk.Label(body, text='欢迎使用 ZGCA Linux 打印驱动', font=self.fonts['title'], wraplength=560)
+        self.title.grid(row=0, sticky='ew', pady=(0, 16))
         self.explanation = ttk.Label(body, text='请连接校园内网。客户端将从学校下载已验证的官方安装包，读取必要配置，不运行原厂程序。', justify='left', wraplength=500)
         self.explanation.grid(row=1, sticky='ew', pady=(0, 18))
         self.message = tk.StringVar(value='正在准备首次配置…')
@@ -43,7 +46,7 @@ class SetupWindow:
         self.root.after(150, self.start);self.root.after(100, self.poll)
 
     def resize(self, event):
-        for label in [self.explanation, self.status, self.note]:label.configure(wraplength=max(200, event.width-56))
+        for label in [self.title, self.explanation, self.status, self.note]:label.configure(wraplength=max(200, event.width-56))
 
     def choose(self):
         path = filedialog.askopenfilename(parent=self.root, title='选择已验证的官方安装包',

@@ -22,6 +22,7 @@ from zgcaprint.desktop.resident import Instance
 from zgcaprint.common.runtime import tray_command, external_env
 from zgcaprint.desktop.tray import MENU_ACTIONS
 from zgcaprint.ui.widgets import checkbox_style, responsive_row
+from zgcaprint.ui.typography import configure_fonts
 
 BG, CARD, INK, MUTED, ACCENT = '#f3f5f9', '#ffffff', '#17243b', '#64748b', '#2563eb'
 STATES = {'prepared':'待提交', 'submitted':'已提交', 'registering':'需核对登记',
@@ -115,23 +116,24 @@ class PrintClientApp:
         self.selection_changed()
 
     def styles(self):
+        self.fonts=configure_fonts(self.root)
         s = ttk.Style(self.root)
         if 'clam' in s.theme_names():s.theme_use('clam')
         s.configure('Card.TFrame',background=CARD)
-        s.configure('TLabel',background=CARD,foreground=INK,font=('sans',10))
+        s.configure('TLabel',background=CARD,foreground=INK,font=self.fonts['body'])
         s.configure('Muted.TLabel',foreground=MUTED)
-        s.configure('Title.TLabel',font=('sans',15,'bold'))
-        s.configure('Section.TLabel',font=('sans',11,'bold'))
-        s.configure('TButton',padding=(12,7),font=('sans',10),background='#eef2f8',foreground=INK)
+        s.configure('Title.TLabel',font=self.fonts['title'])
+        s.configure('Section.TLabel',font=self.fonts['section'])
+        s.configure('TButton',padding=(12,7),font=self.fonts['body'],background='#eef2f8',foreground=INK)
         s.map('TButton',background=[('active','#dce7f8')])
-        s.configure('Primary.TButton',padding=(18,9),background=ACCENT,foreground='white',font=('sans',10,'bold'))
+        s.configure('Primary.TButton',padding=(18,9),background=ACCENT,foreground='white',font=self.fonts['bold'])
         s.map('Primary.TButton',background=[('disabled','#b7c4d7'),('active','#1d4ed8')],foreground=[('disabled','white')])
         s.configure('Gear.TButton',font=('DejaVu Sans',19),padding=(9,2))
         s.configure('TEntry',padding=6)
         s.configure('TCombobox',padding=4)
         checkbox_style(self.root,s)
-        s.configure('Treeview',rowheight=31,font=('sans',10),background=CARD,fieldbackground=CARD,borderwidth=0)
-        s.configure('Treeview.Heading',font=('sans',10,'bold'),padding=(8,7),background='#eef2f8')
+        s.configure('Treeview',rowheight=max(36,self.fonts['body'].metrics('linespace')+14),font=self.fonts['body'],background=CARD,fieldbackground=CARD,borderwidth=0)
+        s.configure('Treeview.Heading',font=self.fonts['bold'],padding=(8,7),background='#eef2f8')
         s.map('Treeview',background=[('selected','#dbeafe')],foreground=[('selected',INK)])
 
     def scroll_area(self, parent, row):
@@ -164,7 +166,7 @@ class PrintClientApp:
 
     def build_ui(self):
         r = self.root;r.title('ZGCA 打印驱动');r.configure(bg=BG)
-        width,height=fit_size(r,920,660);r.geometry(f'{width}x{height}')
+        width,height=fit_size(r,980,720);r.geometry(f'{width}x{height}')
         r.minsize(*fit_size(r,560,420));r.resizable(True,True);r.columnconfigure(0,weight=1);r.rowconfigure(1,weight=1)
         self.styles()
         header = ttk.Frame(r,style='Card.TFrame',padding=(20,12));header.grid(row=0,column=0,sticky='ew')
@@ -198,7 +200,7 @@ class PrintClientApp:
         table = ttk.Frame(jobs,style='Card.TFrame');table.pack(fill='both',expand=True)
         table.rowconfigure(0,weight=1);table.columnconfigure(0,weight=1)
         self.tree = ttk.Treeview(table,columns=('title','pages','options','state'),show='headings',height=5,selectmode='browse')
-        for field,label,width,minimum in [('title','文档',290,140),('pages','页数',48,48),('options','打印设置',190,190),('state','状态',120,120)]:
+        for field,label,width,minimum in [('title','文档',320,160),('pages','页数',64,64),('options','打印设置',240,240),('state','状态',160,160)]:
             self.tree.heading(field,text=label);self.tree.column(field,width=width,minwidth=minimum,stretch=field=='title')
         self.tree.grid(row=0,column=0,sticky='nsew')
         sy = ttk.Scrollbar(table,orient='vertical',command=self.tree.yview);sy.grid(row=0,column=1,sticky='ns')
@@ -208,9 +210,9 @@ class PrintClientApp:
         self.tree.bind('<Delete>',lambda e:self.remove_selected())
         self.footer = tk.Frame(r,bg=CARD,highlightthickness=1,highlightbackground='#e0e6ef')
         self.footer.grid(row=2,column=0,sticky='ew',pady=(12,0));self.footer.columnconfigure(0,weight=1)
-        self.status_label = tk.Label(self.footer,textvariable=self.status,bg=CARD,fg=MUTED,anchor='w',justify='left',font=('sans',10),height=2,wraplength=800)
+        self.status_label = tk.Label(self.footer,textvariable=self.status,bg=CARD,fg=MUTED,anchor='w',justify='left',font=self.fonts['body'],height=2,wraplength=800)
         self.status_label.grid(row=0,column=0,columnspan=2,sticky='ew',padx=20,pady=(5,2))
-        self.summary_label = tk.Label(self.footer,textvariable=self.summary,bg=CARD,fg=INK,anchor='w',justify='left',font=('sans',10),height=2,wraplength=500)
+        self.summary_label = tk.Label(self.footer,textvariable=self.summary,bg=CARD,fg=INK,anchor='w',justify='left',font=self.fonts['body'],height=2,wraplength=500)
         self.summary_label.grid(row=1,column=0,sticky='ew',padx=20,pady=(0,10))
         self.submit_button = self.button(self.footer,'提交任务',self.send,'Primary.TButton')
         self.submit_button.grid(row=1,column=1,sticky='e',padx=20,pady=(0,10))
@@ -287,7 +289,7 @@ class PrintClientApp:
         self.queue_label.pack(anchor='w',pady=(8,0))
         behavior.bind('<Configure>',lambda e:self.queue_label.configure(wraplength=max(160,e.width)))
         bottom=ttk.Frame(w,style='Card.TFrame',padding=(18,10));bottom.grid(row=2,column=0,sticky='ew');bottom.columnconfigure(0,weight=1)
-        settings_message=tk.Label(bottom,textvariable=self.settings_status,wraplength=300,justify='left',anchor='w',height=3,bg=CARD,fg=INK,font=('sans',10))
+        settings_message=tk.Label(bottom,textvariable=self.settings_status,wraplength=300,justify='left',anchor='w',height=3,bg=CARD,fg=INK,font=self.fonts['body'])
         settings_message.grid(row=0,column=0,sticky='ew',padx=(0,10))
         self.settings_done=ttk.Button(bottom,text='完成',command=self.close_settings)
         self.settings_done.grid(row=0,column=1,sticky='e')
@@ -295,7 +297,7 @@ class PrintClientApp:
             if event.widget is w:settings_message.configure(wraplength=max(140,event.width-self.settings_done.winfo_reqwidth()-54))
         w.bind('<Configure>',resize_settings)
         w.protocol('WM_DELETE_WINDOW',self.close_settings);w.bind('<Escape>',lambda e:self.close_settings())
-        center(w,self.root,*fit_size(w,520,700));w.deiconify()
+        center(w,self.root,*fit_size(w,580,760));w.deiconify()
 
     def close_settings(self):
         if self.settings_window is not None:
