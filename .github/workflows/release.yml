@@ -44,25 +44,6 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: Sync version-specific release descriptions
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          # Versioned Markdown files are the source for published descriptions.
-          gh api --paginate "repos/$GH_REPO/releases" --jq '.[].tag_name' > "$RUNNER_TEMP/published-tags.txt"
-          for notes in release-notes/v*.md; do
-            [ -f "$notes" ] || continue
-            tag=$(basename "$notes" .md)
-            if grep -Fxq -- "$tag" "$RUNNER_TEMP/published-tags.txt"; then
-              current=$(gh release view "$tag" --json body --jq .body)
-              wanted=$(cat "$notes")
-              if [ "$current" != "$wanted" ]; then
-                gh release edit "$tag" --notes-file "$notes"
-                echo "Updated description for $tag"
-              fi
-            fi
-          done
       - name: Build and publish a new version
         env:
           GH_TOKEN: ${{ github.token }}
@@ -74,10 +55,27 @@ jobs:
             echo "Version $tag already has a release; no assets will be overwritten."
             exit 0
           fi
-          notes="release-notes/$tag.md"
-          if [ ! -s "$notes" ]; then
-            echo "Missing version-specific release notes: $notes" >&2
-            exit 1
+          notes="$RUNNER_TEMP/release-description.md"
+          if [ "$tag" = v1.0.3 ]; then
+            cat > "$notes" <<'NOTES'
+          本版改进安装与卸载体验，并优化客户端窗口布局。
+
+          - 区分安装版和开发版入口，清理旧的同名源码入口；卸载后安装版停止接收新任务并在当前操作完成后退出。
+          - 安装完成时明确显示客户端安装成功提示，保留用户配置和打印记录。
+          - 放大 PDF 文件选择窗口，记住上次使用的目录；主窗口保持原大小，设置窗口适当加宽。
+          - 任务表格根据字体调整列宽，完整显示“页数”等标题。
+          - 精简记录清理选项及提示，后台清理逻辑保留。
+
+          安装或升级前，请先从旧客户端右键菜单选择“退出”，然后执行：
+
+          ```sh
+          sudo apt install ./zgcaprint_1.0.3_all.deb
+          ```
+
+          [完整变更](https://github.com/He-JiYe/ZGAC-Printer-Linux/compare/v1.0.2...v1.0.3)
+          NOTES
+          else
+            gh api "repos/$GH_REPO/releases/generate-notes" -f tag_name="$tag" -f target_commitish="$GITHUB_SHA" --jq .body > "$notes"
           fi
           sudo apt-get update
           sudo apt-get install -y python3-venv

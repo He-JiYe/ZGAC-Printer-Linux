@@ -24,6 +24,38 @@ DEPENDENCIES = ('python3 (>= 3.10), python3-tk, python3-gi, '
     'cups (>= 2.2), cups (<< 3.0), cups-client, cups-filters, pkexec | policykit-1, xdg-utils')
 
 
+
+def write_maintainer_scripts(control,version):
+    postinst=control/'postinst'
+    postinst.write_text(f'''#!/bin/sh
+set -eu
+if [ "${{1:-}}" = configure ]; then
+  test -x /usr/bin/zgcaprint
+  test -f /usr/lib/zgcaprint/launcher.py
+  test -f /usr/share/applications/org.zgcaprint.Client.desktop
+  actual=$(/usr/bin/zgcaprint --version)
+  [ "$actual" = "{version}" ] || {{ echo "客户端版本检查失败，请重新安装。" >&2; exit 1; }}
+  printf '\\nZGCA Linux 打印驱动：客户端安装完成（版本 %s）。\\n' "$actual"
+  printf '客户端和所需依赖已安装，可从应用菜单打开“ZGCA Linux 打印驱动”。\\n'
+  printf '首次打开时请连接校园内网，配置完成后输入打印账号。安装过程不会自动启动窗口。\\n'
+  printf '如有旧窗口，请先右键“退出”再打开。\\n\\n'
+fi
+''')
+    postinst.chmod(0o755)
+    postrm=control/'postrm'
+    postrm.write_text('''#!/bin/sh
+set -eu
+case "${1:-}" in
+  remove|purge)
+    printf '\\nZGCA Linux 打印驱动：系统客户端程序已卸载。\\n'
+    printf '用户数据和系统钥匙串保留；独立的源码开发版不属于此安装包。\\n\\n'
+    ;;
+esac
+''')
+    postrm.chmod(0o755)
+
+
+
 def build():
     inputs, secrets = audit_sources()
     hashes = {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in inputs}
@@ -70,6 +102,7 @@ def build():
     size = sum(p.stat().st_size for p in (work/'usr').rglob('*') if p.is_file())
     (control/'control').write_text(f'Package: zgcaprint\nVersion: {__version__}\nSection: utils\nPriority: optional\nArchitecture: all\nMaintainer: ZGCA Print contributors\nDepends: {DEPENDENCIES}\nInstalled-Size: {(size+1023)//1024}\nHomepage: https://github.com/He-JiYe/ZGAC-Printer-Linux\nDescription: ZGCA Linux PDF and browser print client\n Non-official campus printing adapter with automatic first-run setup.\n No vendor installer, account, password or private profile is bundled.\n')
     (control/'control').chmod(0o644)
+    write_maintainer_scripts(control,__version__)
     audit_sources()
     if any(hashlib.sha256((ROOT/name).read_bytes()).hexdigest()!=value for name,value in hashes.items()):
         raise SystemExit('Public inputs changed during build; rebuild before releasing.')

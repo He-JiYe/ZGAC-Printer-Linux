@@ -6,7 +6,7 @@ import subprocess
 import time
 import threading
 import tkinter as tk
-from tkinter import filedialog, ttk
+from tkinter import ttk
 
 from zgcaprint.desktop import startup
 from zgcaprint.printing import cache
@@ -19,10 +19,11 @@ from zgcaprint.printing.jobs import MAX_PDF, adopt_cups_jobs, discard_remote_sta
 from zgcaprint.config.profile import json_write, load_profile, private_dir, read_private, read_private_bytes
 from zgcaprint.protocol.client import V5Client
 from zgcaprint.desktop.resident import Instance
-from zgcaprint.common.runtime import tray_command, external_env
+from zgcaprint.common.runtime import tray_command, external_env, installation_kind, application_name
 from zgcaprint.desktop.tray import MENU_ACTIONS
 from zgcaprint.ui.widgets import PasswordEntry, checkbox_style, responsive_row
 from zgcaprint.ui.typography import configure_fonts
+from zgcaprint.ui.file_picker import choose_pdf, initial_directory, remember_directory
 
 BG, CARD, INK, MUTED, ACCENT = '#f3f5f9', '#ffffff', '#17243b', '#64748b', '#2563eb'
 STATES = {'prepared':'待提交', 'submitted':'已提交', 'registering':'需核对登记',
@@ -40,6 +41,7 @@ class PrintClientApp:
         self.store = store or CredentialStore(self.profile['base_url'])
         self.client_factory, self.spool_base = client_factory, spool_base
         self.root = root or tk.Tk()
+        self.package_managed=installation_kind()=='package'
         self.instance, self.tray, self.tray_ready = instance, None, False
         self.tray_buffer = b''
         self.settings_window, self.dialog = None, None
@@ -165,8 +167,8 @@ class PrintClientApp:
         return inner
 
     def build_ui(self):
-        r = self.root;r.title('ZGCA 打印驱动');r.configure(bg=BG)
-        width,height=fit_size(r,980,720);r.geometry(f'{width}x{height}')
+        r = self.root;r.title(application_name());r.configure(bg=BG)
+        width,height=fit_size(r,920,660);r.geometry(f'{width}x{height}')
         r.minsize(*fit_size(r,560,420));r.resizable(True,True);r.columnconfigure(0,weight=1);r.rowconfigure(1,weight=1)
         self.styles()
         header = ttk.Frame(r,style='Card.TFrame',padding=(20,12));header.grid(row=0,column=0,sticky='ew')
@@ -200,8 +202,9 @@ class PrintClientApp:
         table = ttk.Frame(jobs,style='Card.TFrame');table.pack(fill='both',expand=True)
         table.rowconfigure(0,weight=1);table.columnconfigure(0,weight=1)
         self.tree = ttk.Treeview(table,columns=('title','pages','options','state'),show='headings',height=5,selectmode='browse')
-        for field,label,width,minimum in [('title','文档',320,160),('pages','页数',64,64),('options','打印设置',240,240),('state','状态',160,160)]:
-            self.tree.heading(field,text=label);self.tree.column(field,width=width,minwidth=minimum,stretch=field=='title')
+        self._table_font_signature=None
+        self.configure_task_columns()
+        self.tree.bind('<Configure>',lambda event:self.configure_task_columns())
         self.tree.grid(row=0,column=0,sticky='nsew')
         sy = ttk.Scrollbar(table,orient='vertical',command=self.tree.yview);sy.grid(row=0,column=1,sticky='ns')
         sx = ttk.Scrollbar(table,orient='horizontal',command=self.tree.xview);sx.grid(row=1,column=0,sticky='ew')
@@ -225,6 +228,22 @@ class PrintClientApp:
         r.bind('<Configure>',self.resize_footer)
         r.bind_all('<MouseWheel>',self.mousewheel);r.bind_all('<Button-4>',self.mousewheel);r.bind_all('<Button-5>',self.mousewheel)
         r.protocol('WM_DELETE_WINDOW',self.hide)
+
+    def configure_task_columns(self):
+        body,heading=self.fonts['body'],self.fonts['bold']
+        signature=(body.measure('99 份 · 彩色 · 短边双面'),heading.measure('页数'),body.metrics('linespace'))
+        if signature==self._table_font_signature:return
+        self._table_font_signature=signature
+        padding=max(28,body.metrics('linespace'))
+        pages=max(84,heading.measure('页数')+padding,body.measure('2000')+padding)
+        options=max(heading.measure('打印设置'),signature[0])+padding
+        state=max(heading.measure('状态'),*(body.measure(text) for text in STATES.values()))+padding
+        for field,label,width,minimum in [('title','文档',320,180),('pages','页数',pages,pages),
+                ('options','打印设置',options,options),('state','状态',state,state)]:
+            self.tree.heading(field,text=label,anchor='center' if field in ['pages','state'] else 'w')
+            self.tree.column(field,width=width,minwidth=minimum,stretch=field=='title',
+                anchor='center' if field in ['pages','state'] else 'w')
+        ttk.Style(self.root).configure('Treeview',rowheight=max(36,body.metrics('linespace')+14))
 
     def resize_footer(self,event):
         if event.widget is self.root:
@@ -281,10 +300,6 @@ class PrintClientApp:
         behavior=self.card(self.settings_body,1,'启动与打印')
         for label,var,callback in [('自动启动',self.boot_login,self.toggle_startup),('自动提交任务',self.auto_submit,self.toggle_submission)]:
             self.control(ttk.Checkbutton(behavior,text=label,variable=var,command=callback)).pack(anchor='w')
-        retention_row=ttk.Frame(behavior,style='Card.TFrame');retention_row.pack(fill='x',pady=(8,0))
-        retention_label=ttk.Label(retention_row,text='已提交记录')
-        retention=self.control(ttk.Combobox(retention_row,textvariable=self.retention,values=list(cache.POLICIES.values()),state='readonly',width=15))
-        responsive_row(retention_row,[retention_label,retention],gap=12);retention.bind('<<ComboboxSelected>>',lambda e:self.change_retention())
         self.button(behavior,'更新打印机',self.setup_queue).pack(anchor='w',pady=(12,0))
         self.queue_label=ttk.Label(behavior,textvariable=self.queue_status,style='Muted.TLabel',wraplength=380)
         self.queue_label.pack(anchor='w',pady=(8,0))
@@ -298,7 +313,7 @@ class PrintClientApp:
             if event.widget is w:settings_message.configure(wraplength=max(140,event.width-self.settings_done.winfo_reqwidth()-54))
         w.bind('<Configure>',resize_settings)
         w.protocol('WM_DELETE_WINDOW',self.close_settings);w.bind('<Escape>',lambda e:self.close_settings())
-        center(w,self.root,*fit_size(w,580,760));w.deiconify()
+        center(w,self.root,*fit_size(w,640,760));w.deiconify()
 
     def close_settings(self):
         if self.settings_window is not None:
@@ -405,7 +420,6 @@ class PrintClientApp:
             self.save_auto_setting()
             if self.retention_policy()=='day':
                 cache.prune(self.home,'day');self.refresh()
-            self.notify('已保存；仅清理已提交记录。' if self.retention_policy()!='startup' else '下次启动时清理已提交记录。',settings=True)
         except (OSError,PrintError):self.notify('缓存设置或清理未完成，已有任务已保留。',True,True)
 
     def toggle_startup(self):
@@ -473,8 +487,11 @@ class PrintClientApp:
         except (PrintError,OSError,ValueError):self.notify('下次自动登录设置未能保存，请检查本地配置。',True,True)
 
     def choose_file(self):
-        path=filedialog.askopenfilename(parent=self.root,title='选择 PDF',filetypes=[('PDF 文件','*.pdf'),('所有文件','*')])
-        if path:self.file_var.set(path)
+        path=choose_pdf(self.root,initial_directory(self.home))
+        if path:
+            self.file_var.set(path)
+            try:remember_directory(self.home,path)
+            except (PrintError,OSError,ValueError):self.notify('文件已选择，但上次目录未能保存。',True)
 
     def prepare_file(self):
         if self.busy:return
@@ -557,7 +574,14 @@ class PrintClientApp:
             install_queue(self.home);return {'message':'打印机配置已更新。','queue_changed':True}
         self.start(work,'请在系统授权窗口完成管理员验证…',kind='settings')
 
+    def package_removed(self):
+        return self.package_managed and not Path('/usr/bin/zgcaprint').is_file()
+
     def poll(self):
+        if self.package_removed():
+            self.auto_submit.set(False)
+            if not self.busy and not self.importing:self.close();return
+            self.notify('客户端程序已卸载，当前操作完成后会自动退出。')
         for _ in range(20):
             try:result=self.events.get_nowait()
             except queue.Empty:break
@@ -586,9 +610,11 @@ class PrintClientApp:
                 self.automation.observe(self.jobs,self.auto_submit.get())
                 self.tree.selection_set(result['prepared']);self.tree.see(result['prepared'])
             if result.get('queue_changed'):self.check_queue()
+        if self.package_removed() and not self.busy and not self.importing:self.close();return
         self.schedule(200,self.poll)
 
     def watch(self):
+        if self.package_removed():return
         if not self.importing:
             self.importing=True
             def import_spool():
@@ -668,6 +694,11 @@ def run(home,allow_http=False,background=False):
     home=private_dir(Path(home).resolve());instance=Instance(home)
     try:
         if not instance.primary:return
+        startup_error=False
+        try:
+            startup.quarantine_legacy_sources(home)
+            startup.refresh_package_entries(home,allow_http)
+        except (PrintError,OSError,ValueError):startup_error=True
         first_run=not (home/'profile.json').exists()
         if first_run:
             if not allow_http:raise PrintError('首次配置需要连接学校 HTTP 服务，请使用 gui --allow-http。')
@@ -681,6 +712,7 @@ def run(home,allow_http=False,background=False):
         except (PrintError,OSError,ValueError):cleanup_error=True
         app=PrintClientApp(home,allow_http,profile=profile,background=background,instance=instance)
         if first_run:app.schedule(200,app.open_settings)
+        if startup_error:app.notify('旧启动入口更新未完成，请检查个人启动目录权限。',True)
         if cleanup_error:app.notify('缓存清理未完成，已有任务已保留。',True)
         app.root.mainloop()
     finally:instance.close()

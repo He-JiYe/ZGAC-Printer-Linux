@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "zgcaprint"
-version = "1.0.2"
+version = "1.0.3"
 description = "Local Linux PDF print client for an existing XZ v5 print service"
 readme = "README.md"
 license = "MIT"

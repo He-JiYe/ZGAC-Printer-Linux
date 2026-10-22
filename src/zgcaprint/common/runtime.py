@@ -33,3 +33,14 @@ def tray_command():
 
 def keyring_command():
     return ['/usr/bin/python3','-I',str(resource_root()/'system_helpers/keyring_entry.py')]
+
+
+def installation_kind():
+    if frozen():return 'standalone'
+    if resource_root()==Path('/usr/lib/zgcaprint/zgcaprint'):return 'package'
+    return 'source'
+
+
+def application_name():
+    return {'package':'ZGCA Linux 打印驱动','source':'ZGCA Linux 打印驱动（开发版）',
+        'standalone':'ZGCA Linux 打印驱动（独立版）'}[installation_kind()]

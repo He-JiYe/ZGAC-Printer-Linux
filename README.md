@@ -2,7 +2,7 @@
 
 # ZGCA Linux 打印驱动
 
-**[v1.0.2](https://github.com/He-JiYe/ZGAC-Printer-Linux/releases/tag/v1.0.2)** · [License](LICENCE) · [Releases](https://github.com/He-JiYe/ZGAC-Printer-Linux/releases)
+**[v1.0.3](https://github.com/He-JiYe/ZGAC-Printer-Linux/releases/tag/v1.0.3)** · [License](LICENCE) · [Releases](https://github.com/He-JiYe/ZGAC-Printer-Linux/releases)
 
 </div>
 
@@ -18,12 +18,12 @@
 
 ### 普通用户
 
-1. 在 [Releases](https://github.com/He-JiYe/ZGAC-Printer-Linux/releases) 下载 `zgcaprint_1.0.2_all.deb`。
+1. 在 [Releases](https://github.com/He-JiYe/ZGAC-Printer-Linux/releases) 下载 `zgcaprint_1.0.3_all.deb`。
 
 2. 在下载目录执行以下命令，系统会自动安装依赖：
 
    ```sh
-   sudo apt install ./zgcaprint_1.0.2_all.deb
+   sudo apt install ./zgcaprint_1.0.3_all.deb
    ```
 
 3. 从应用菜单打开 **ZGCA Linux 打印驱动**，保持连接校园内网，等待首次配置完成。

@@ -30,3 +30,6 @@ __pycache__/
 .agents
 .codex
 .aws
+
+# Release descriptions are published on GitHub only
+/release-notes/

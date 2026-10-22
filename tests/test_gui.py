@@ -413,3 +413,61 @@ def test_unremembered_password_field_is_empty_after_removal_and_logout(app):
     assert not database
     app.logout();app.root.update()
     assert app.password_entry.get()=='' and not app.password_entry._marker.winfo_viewable()
+
+
+def test_pdf_selection_remembers_folder_but_cancel_preserves_selection(app,tmp_path,monkeypatch):
+    import zgcaprint.ui.window as gui
+    from zgcaprint.ui.file_picker import initial_directory
+    folder=tmp_path/'pdfs';folder.mkdir()
+    selected=folder/'sample.pdf';selected.write_bytes(b'synthetic')
+    seen=[]
+    def choose(parent,directory):
+        seen.append(Path(directory))
+        return str(selected) if len(seen)==1 else ''
+    from pathlib import Path
+    monkeypatch.setattr(gui,'choose_pdf',choose)
+    app.choose_file()
+    assert initial_directory(app.home)==folder and app.file_var.get()==str(selected)
+    app.choose_file()
+    assert seen[1]==folder and app.file_var.get()==str(selected)
+
+
+def test_native_pdf_picker_is_large_and_cancel_keeps_no_extra_callbacks(app,tmp_path):
+    from zgcaprint.ui.file_picker import choose_pdf
+    measured=[]
+    def cancel():
+        for window in app.root.tk.splitlist(app.root.tk.call('winfo','children','.')):
+            if app.root.tk.call('winfo','class',window)=='TkFDialog':
+                measured.append((int(app.root.tk.call('winfo','width',window)),int(app.root.tk.call('winfo','height',window))))
+                app.root.tk.call('::tk::dialog::file::CancelCmd',window)
+    timer=app.root.after(400,cancel)
+    emergency=app.root.after(3000,lambda:app.root.setvar('::tk::Priv(selectFilePath)',''))
+    try:
+        assert not choose_pdf(app.root,tmp_path)
+        assert measured and measured[0][0]>=1000 and measured[0][1]>=650
+    finally:
+        for item in [timer,emergency]:
+            try:app.root.after_cancel(item)
+            except Exception:pass
+
+
+def test_page_column_fits_actual_font_even_when_heading_is_enlarged(app):
+    assert app.tree.column('pages','width')>=app.fonts['bold'].measure('页数')+24
+    assert app.tree.column('pages','width')>=app.fonts['body'].measure('2000')+24
+    app.fonts['bold'].configure(size=24)
+    app.configure_task_columns();app.root.update()
+    assert app.tree.column('pages','minwidth')>=app.fonts['bold'].measure('页数')+24
+    assert str(app.tree.column('pages','anchor'))=='center'
+
+
+def test_removed_package_exits_idle_client_without_losing_local_records(app,monkeypatch):
+    from tests.test_client import pdf_bytes
+    from zgcaprint.printing.jobs import prepare,load_job
+    job=prepare(app.home,pdf_bytes(),'synthetic.pdf')
+    monkeypatch.setattr(app,'package_removed',lambda:True)
+    close=app.close
+    monkeypatch.setattr(app,'close',lambda:setattr(app,'closed_for_uninstall',True))
+    try:
+        app.poll()
+        assert app.closed_for_uninstall and load_job(app.home,job['id'])['state']=='prepared'
+    finally:monkeypatch.setattr(app,'close',close)
