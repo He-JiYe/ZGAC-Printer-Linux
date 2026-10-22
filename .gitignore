@@ -1,0 +1,32 @@
+# Original software, internal investigation, credentials, and print documents
+/analysis/
+/.local/
+*.exe
+*.pkg
+*.zip
+*.docx
+*.pdf
+!/examples/print-test.pdf
+*.pji
+*.dat
+*.log
+__pycache__/
+.pytest_cache/
+*.egg-info/
+/build/
+/dist/
+/.venv/
+
+# Saved authenticated school pages may contain personal data
+/自助打印平台.html
+/自助打印平台_files/
+/install-zgcaprint-cups.sh
+/install-zgcaprint-cups.files/
+
+/.build-venv/
+*.spec
+
+# Agent
+.agents
+.codex
+.aws

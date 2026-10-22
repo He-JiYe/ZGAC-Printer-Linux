@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zgcaprint"
+version = "1.0.0"
+description = "Local Linux PDF print client for an existing XZ v5 print service"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENCE"]
+requires-python = ">=3.10"
+dependencies = ["pypdf>=6.21.2,<7"]
+
+[project.optional-dependencies]
+build = ["pyinstaller==6.22.3"]
+dev = ["pytest>=8,<10", "reportlab>=4,<5"]
+
+[project.scripts]
+zgcaprint = "zgcaprint.application.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["zgcaprint*"]
+namespaces = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.setuptools.data-files]
+"share/doc/zgcaprint" = ["README.md"]
+"share/doc/zgcaprint/examples" = ["examples/print-test.pdf"]
