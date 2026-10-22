@@ -15,6 +15,7 @@ concurrency:
 jobs:
   test:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-22.04, ubuntu-24.04]
     runs-on: ${{ matrix.os }}
@@ -28,6 +29,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python3-venv python3-tk libgcrypt20 xvfb
           python3 -m venv --system-site-packages .venv
+          .venv/bin/python -m pip install --upgrade pip setuptools wheel
           .venv/bin/python -m pip install -e '.[dev]'
       - name: Run offline regression suite
         run: xvfb-run -a env ZGCAPRINT_TEST_UI=1 .venv/bin/python -m pytest -q

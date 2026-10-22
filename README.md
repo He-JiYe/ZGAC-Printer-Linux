@@ -40,6 +40,7 @@ sudo apt install ./zgcaprint_1.0.0_all.deb
 
 ```sh
 python3 -m venv --system-site-packages .venv
+.venv/bin/python -m pip install --upgrade pip setuptools wheel
 .venv/bin/python -m pip install -e '.[dev]'
 .venv/bin/python -m zgcaprint gui --allow-http
 
