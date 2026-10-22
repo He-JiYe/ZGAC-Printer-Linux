@@ -21,7 +21,7 @@ from zgcaprint.protocol.client import V5Client
 from zgcaprint.desktop.resident import Instance
 from zgcaprint.common.runtime import tray_command, external_env
 from zgcaprint.desktop.tray import MENU_ACTIONS
-from zgcaprint.ui.widgets import checkbox_style, responsive_row
+from zgcaprint.ui.widgets import PasswordEntry, checkbox_style, responsive_row
 from zgcaprint.ui.typography import configure_fonts
 
 BG, CARD, INK, MUTED, ACCENT = '#f3f5f9', '#ffffff', '#17243b', '#64748b', '#2563eb'
@@ -267,9 +267,10 @@ class PrintClientApp:
         fields = ttk.Frame(account,style='Card.TFrame');fields.pack(fill='x');fields.columnconfigure(1,weight=1)
         for i,(label,var,secret) in enumerate([('账号',self.user,False),('密码',self.password,True)]):
             ttk.Label(fields,text=label,style='Muted.TLabel').grid(row=i,column=0,sticky='w',padx=(0,14),pady=5)
-            entry=self.control(ttk.Entry(fields,textvariable=var,show='●' if secret else ''))
+            entry=self.control(PasswordEntry(fields,textvariable=var) if secret else ttk.Entry(fields,textvariable=var))
             entry.grid(row=i,column=1,sticky='ew',pady=5)
             if secret:self.password_entry=entry
+        self.refresh_password_hint()
         checks = ttk.Frame(account,style='Card.TFrame');checks.pack(fill='x',pady=(8,0))
         remember=self.control(ttk.Checkbutton(checks,text='记住密码',variable=self.remember,command=self.toggle_remember))
         auto=self.control(ttk.Checkbutton(checks,text='自动登录',variable=self.auto_login,command=self.toggle_login))
@@ -356,6 +357,15 @@ class PrintClientApp:
         if self.logged_in and self.user.get().strip()!=self.cached['account']:
             self.logged_in=False;self.cached.update(account='',password=None);self.badge.set('未登录')
             self.automation.arm(self.read_jobs())
+        self.refresh_password_hint()
+
+    def refresh_password_hint(self):
+        entry=getattr(self,'password_entry',None)
+        if entry is None or not entry.winfo_exists():return
+        try:prefs=preferences(self.home,self.profile['base_url'])
+        except (PrintError,OSError,ValueError):prefs={}
+        entry.set_saved(bool(self.remember.get() and prefs.get('remember') and
+            self.user.get().strip() and prefs.get('account')==self.user.get().strip()))
 
     def persist_login_options(self):
         if self.busy:return
@@ -375,6 +385,7 @@ class PrintClientApp:
 
     def toggle_remember(self):
         if not self.remember.get():self.auto_login.set(False)
+        self.refresh_password_hint()
         self.persist_login_options()
 
     def toggle_login(self):
@@ -457,6 +468,7 @@ class PrintClientApp:
         try:
             prefs=preferences(self.home,self.profile['base_url'])
             json_write(self.home/'preferences.json',{'server':self.profile['base_url'],**prefs,'auto_login':False})
+            self.refresh_password_hint()
             self.notify('',settings=True)
         except (PrintError,OSError,ValueError):self.notify('下次自动登录设置未能保存，请检查本地配置。',True,True)
 
@@ -558,6 +570,7 @@ class PrintClientApp:
             if 'password' in result:
                 self.cached.update(account=result['account'],password=result.pop('password'))
                 self.logged_in=True;self.badge.set('已登录')
+            if result.get('kind') in ['login','settings']:self.refresh_password_hint()
             text=result.get('error',result.get('message','操作完成。'))
             if login_success:text=text.removeprefix('已登录。').strip()
             if result.get('automatic'):

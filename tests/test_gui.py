@@ -343,3 +343,73 @@ def test_new_source_file_can_be_previewed_when_an_old_receipt_was_selected(app,m
     calls=[];monkeypatch.setattr('zgcaprint.ui.window.preview_pdf',lambda path:calls.append(path))
     app.preview();pump(app,lambda:not app.busy)
     assert calls==[str(source)]
+
+
+def saved_password_fixture(app):
+    from zgcaprint.config.credentials import CredentialStore,remember_login
+    database={};lookups=[]
+    def backend(operation,server,account,password):
+        if operation=='store':database[account]=password;return True
+        if operation=='lookup':lookups.append(account);return database.get(account)
+        if operation=='clear':database.pop(account,None);return True
+    app.store=CredentialStore(app.profile['base_url'],backend)
+    remember_login(app.home,app.store,'student','synthetic-long-saved-password')
+    app.user.set('student');app.remember.set(True)
+    app.open_settings();app.root.update()
+    return database,lookups
+
+
+def test_saved_password_hint_is_visual_only_and_never_reads_keyring_on_open(app):
+    _,lookups=saved_password_fixture(app)
+    assert app.password_entry._marker.winfo_viewable()
+    assert app.password_entry._marker.cget('text')=='●'*8
+    assert app.password.get()==app.password_entry.get()==''
+    assert lookups==[]
+    app.close_settings()
+    app.password.set('')  # Destroyed entries must release their variable trace.
+    app.open_settings();app.root.update()
+    assert app.password_entry._marker.winfo_viewable()
+    assert lookups==[]
+
+
+def test_hint_after_logout_reuses_real_saved_password_in_login(app):
+    _,lookups=saved_password_fixture(app)
+    supplied=[]
+    class Client:
+        def __init__(self,*args):pass
+        def authenticate_client(self):pass
+        def verify_user(self,account,password):supplied.append((account,password))
+    app.client_factory=Client
+    app.logout();app.root.update()
+    assert app.password_entry._marker.winfo_viewable() and app.password.get()==''
+    app.login();pump(app,lambda:not app.busy)
+    assert supplied==[('student','synthetic-long-saved-password')]
+    assert lookups==['student'] and app.logged_in
+
+
+def test_switching_accounts_hides_saved_hint_and_typed_dots_are_a_real_password(app):
+    _,lookups=saved_password_fixture(app)
+    app.user.set('other');app.root.update()
+    assert not app.password_entry._marker.winfo_viewable() and app.password.get()==''
+    app.user.set('student');app.root.update()
+    assert app.password_entry._marker.winfo_viewable()
+    supplied=[]
+    class Client:
+        def __init__(self,*args):pass
+        def authenticate_client(self):pass
+        def verify_user(self,account,password):supplied.append(password)
+    app.client_factory=Client
+    app.password.set('●'*8);app.root.update()
+    assert not app.password_entry._marker.winfo_viewable()
+    app.login();pump(app,lambda:not app.busy)
+    assert supplied==['●'*8] and lookups==[]
+
+
+def test_unremembered_password_field_is_empty_after_removal_and_logout(app):
+    database,_=saved_password_fixture(app)
+    app.remember.set(False);app.toggle_remember();app.root.update()
+    assert not app.password_entry._marker.winfo_viewable()
+    pump(app,lambda:not app.busy)
+    assert not database
+    app.logout();app.root.update()
+    assert app.password_entry.get()=='' and not app.password_entry._marker.winfo_viewable()

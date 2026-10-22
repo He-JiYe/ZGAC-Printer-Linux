@@ -3,7 +3,48 @@ from functools import lru_cache
 import math
 import struct
 import tkinter as tk
+from tkinter import ttk
 import zlib
+
+
+class PasswordEntry(ttk.Entry):
+    """Paint a saved-password hint without putting a placeholder in the value."""
+    def __init__(self,master,*,textvariable,**kwargs):
+        super().__init__(master,textvariable=textvariable,show='●',**kwargs)
+        self._value=textvariable
+        self._saved=False
+        self._marker=tk.Label(self,text='●'*8,borderwidth=0,padx=0,pady=0,cursor='xterm')
+        self._marker.bind('<Button-1>',self._focus_input)
+        self._trace=self._value.trace_add('write',self._render_saved)
+        self.bind('<Configure>',self._render_saved,add='+')
+        self.bind('<Destroy>',self._remove_trace,add='+')
+
+    def set_saved(self,saved):
+        self._saved=bool(saved)
+        self._render_saved()
+
+    def _render_saved(self,*args):
+        if not self.winfo_exists():return
+        if self._saved and not self._value.get():
+            style=ttk.Style(self)
+            background=style.lookup(self.cget('style') or 'TEntry','fieldbackground',self.state()) or 'white'
+            self._marker.configure(font=self.cget('font'),background=background,foreground='#17243b')
+            self._marker.place(x=8,rely=0.5,anchor='w')
+        else:self._marker.place_forget()
+
+    def state(self,statespec=None):
+        result=super().state(statespec)
+        if statespec is not None and hasattr(self,'_marker'):self._render_saved()
+        return result
+
+    def _focus_input(self,event):
+        if not self.instate(['disabled']):self.focus_set();self.icursor('end')
+        return 'break'
+
+    def _remove_trace(self,event):
+        if event.widget is self:
+            try:self._value.trace_remove('write',self._trace)
+            except tk.TclError:pass
 
 
 def rgb(value):
