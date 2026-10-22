@@ -30,6 +30,8 @@ def test_generated_backend_is_self_contained_and_has_no_upload_or_credentials(tm
     assert not (bundle/'zgcaprint/protocol').exists()
     assert not (bundle/'zgcaprint/config/credentials.py').exists()
     assert not (bundle/'profile.json').exists()
+    assert (bundle/'typing_extensions.py').is_file()
+    assert (bundle/'typing_extensions-LICENSE').is_file()
     # Isolated system Python cannot fall back to the editable source install.
     command = (
         'import sys; sys.path.insert(0,sys.argv[1]); '

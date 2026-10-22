@@ -21,7 +21,7 @@ sys.path.insert(0,str(ROOT/'src'))
 from release_audit import audit_sources
 from zgcaprint import __version__
 from zgcaprint.config.profile import default_home, read_private
-from zgcaprint.cups.payload import copy_backend_package
+from zgcaprint.cups.payload import copy_backend_package, copy_pdf_dependencies
 
 
 def license_file(distribution,suffix):
@@ -76,8 +76,7 @@ def main():
     payload=stage/'backend_payload';package=payload/'zgcaprint'
     copy_backend_package(source,package)
     import pypdf
-    shutil.copytree(Path(pypdf.__file__).parent,payload/'pypdf',ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
-    shutil.copyfile(license_file('pypdf','/licenses/LICENSE'),payload/'pypdf-LICENSE')
+    copy_pdf_dependencies(payload)
     shutil.copyfile(ROOT/'LICENCE',payload/'LICENCE')
     helpers=stage/'system_helpers';helper_package=helpers/'zgcaprint'
     for name in ['__init__.py','common/__init__.py','common/errors.py','config/__init__.py','config/keyring.py']:

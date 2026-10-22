@@ -11,7 +11,7 @@ import shutil
 from zgcaprint.common.errors import PrintError
 from zgcaprint.config.profile import load_profile
 from zgcaprint.common.runtime import frozen, resource_root
-from zgcaprint.cups.payload import BACKEND_FILES, copy_backend_package
+from zgcaprint.cups.payload import BACKEND_FILES, copy_backend_package, copy_pdf_dependencies
 
 
 def generate(home, output):
@@ -35,14 +35,13 @@ def generate(home, output):
         shutil.copytree(payload/'pypdf',bundle/'pypdf')
         shutil.copyfile(payload/'pypdf-LICENSE',bundle/'pypdf-LICENSE')
         shutil.copyfile(payload/'LICENCE',bundle/'LICENCE')
+        for name in ['typing_extensions.py','typing_extensions-LICENSE']:
+            shutil.copyfile(payload/name,bundle/name)
     else:
         import pypdf
         if tuple(int(v) for v in pypdf.__version__.split('.')) < (6,21,2):
             raise PrintError('请先更新应用环境中的 pypdf 到 6.21.2 或以上版本。')
-        shutil.copytree(Path(pypdf.__file__).parent,bundle/'pypdf',ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
-        distribution=importlib.metadata.distribution('pypdf')
-        license_file=next(v for v in distribution.files if str(v).endswith('/licenses/LICENSE'))
-        shutil.copyfile(distribution.locate_file(license_file),bundle/'pypdf-LICENSE')
+        copy_pdf_dependencies(bundle)
         package_root=Path(__file__).resolve().parents[1]
         own_license=package_root.parent/'LICENCE'
         if not own_license.is_file():own_license=package_root.parent.parent/'LICENCE'
@@ -67,14 +66,6 @@ export PATH
 # This creates the browser/system print entry. The desktop client handles upload.
 [ "$(id -u)" -eq 0 ] || {{ echo "请使用 sudo 执行此安装脚本。" >&2; exit 1; }}
 /usr/bin/python3 -I -c 'import sys; sys.version_info >= (3,10) or sys.exit("系统 Python 须为 3.10 或以上，尚未修改打印入口。")'
-/usr/bin/python3 -I - <<'PYCOMPAT'
-import sys
-if sys.version_info < (3,11):
-    try:
-        from typing_extensions import Self
-    except ImportError:
-        raise SystemExit('系统 Python 3.10 需要 python3-typing-extensions，尚未修改打印入口。')
-PYCOMPAT
 command -v lpadmin >/dev/null
 test -f /etc/cups/cupsd.conf
 grep -Eq '<Policy[[:space:]]+authenticated>' /etc/cups/cupsd.conf || {{ echo "缺少 authenticated 打印策略，停止安装。" >&2; exit 1; }}
@@ -118,6 +109,8 @@ chown -R root:root /usr/local/lib/zgcaprint-cups/pypdf
 find /usr/local/lib/zgcaprint-cups/pypdf -type d -exec chmod 0755 {{}} \\;
 find /usr/local/lib/zgcaprint-cups/pypdf -type f -exec chmod 0644 {{}} \\;
 install -o root -g root -m 0644 "$src/pypdf-LICENSE" /usr/local/lib/zgcaprint-cups/pypdf-LICENSE
+install -o root -g root -m 0644 "$src/typing_extensions.py" /usr/local/lib/zgcaprint-cups/typing_extensions.py
+install -o root -g root -m 0644 "$src/typing_extensions-LICENSE" /usr/local/lib/zgcaprint-cups/typing_extensions-LICENSE
 install -o root -g root -m 0644 "$src/LICENCE" /usr/local/lib/zgcaprint-cups/LICENCE
 install -o root -g root -m 0644 "$src/backend_runner.py" /usr/local/lib/zgcaprint-cups/backend_runner.py
 install -o root -g root -m 0644 "$src/cups.json" /etc/zgcaprint-cups.json

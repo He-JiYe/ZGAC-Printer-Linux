@@ -17,8 +17,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT/'src'))
 from release_audit import audit_sources
 from zgcaprint import __version__
+from zgcaprint.cups.payload import copy_pdf_dependencies
 
-DEPENDENCIES = ('python3 (>= 3.10), python3-tk, python3-gi, python3-typing-extensions, '
+DEPENDENCIES = ('python3 (>= 3.10), python3-tk, python3-gi, '
     'gir1.2-secret-1, gir1.2-ayatanaappindicator3-0.1, gnome-keyring, libgcrypt20, '
     'cups (>= 2.2), cups (<< 3.0), cups-client, cups-filters, pkexec | policykit-1, xdg-utils')
 
@@ -34,7 +35,7 @@ def build():
         target = app/'zgcaprint'/source.relative_to(ROOT/'src/zgcaprint')
         target.parent.mkdir(parents=True, exist_ok=True);shutil.copyfile(source, target)
     work.chmod(0o755)
-    shutil.copytree(Path(pypdf.__file__).parent, app/'pypdf', ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
+    copy_pdf_dependencies(app)
     distribution = metadata.distribution('pypdf')
     record = next(v for v in distribution.files if str(v).endswith('.dist-info/METADATA'))
     metadata_dir = distribution.locate_file(record).parent
@@ -53,7 +54,7 @@ def build():
     shutil.copyfile(ROOT/'examples/print-test.pdf', documentation/'examples/print-test.pdf')
     license_file = next(v for v in distribution.files if str(v).endswith('/licenses/LICENSE'))
     pypdf_license = distribution.locate_file(license_file).read_text()
-    (documentation/'copyright').write_text('Project: ZGCA Linux print driver\nOriginal code: MIT\n\n'+(ROOT/'LICENCE').read_text()+'\n\nBundled pypdf: BSD-3-Clause\n\n'+pypdf_license)
+    (documentation/'copyright').write_text('Project: ZGCA Linux print driver\nOriginal code: MIT\n\n'+(ROOT/'LICENCE').read_text()+'\n\nBundled pypdf: BSD-3-Clause\n\n'+pypdf_license+'\n\nBundled typing_extensions:\n\n'+(app/'typing_extensions-LICENSE').read_text())
     info = {'project':'zgcaprint', 'version':__version__, 'format':'deb', 'architecture':'all',
         'runtime':'system Python >=3.10; system CUPS 2.x', 'pypdf':pypdf.__version__,
         'source_sha256':hashes, 'vendor_files_included':False}
